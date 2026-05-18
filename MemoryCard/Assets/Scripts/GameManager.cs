@@ -169,16 +169,10 @@ public class GameManager : MonoBehaviour
     // 🔥 HÀM RESTART - PUBLIC
     public void RestartGame()
     {
-        // Dòng này sẽ in ra DÙ CHO CODE CÓ LỖI
-        Debug.LogError("⚠️ RESTARTGAME() ĐƯỢC GỌI! NẾU BẠN THẤY DÒNG NÀY THÌ NÚT ĐANG HOẠT ĐỘNG ⚠️");
+        Debug.Log("RESTART CLICK");
 
-        try
-        {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError("LỖI KHI RESTART: " + e.Message);
-        }
+        Time.timeScale = 1f;
+
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }

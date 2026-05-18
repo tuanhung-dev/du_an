@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class Snake : MonoBehaviour
 {
@@ -13,17 +12,14 @@ public class Snake : MonoBehaviour
     // Prefab thân rắn
     public Transform bodyPrefab;
 
-    // Panel Game Over
-    public GameObject gameOverPanel;
-
     // Danh sách thân rắn
     private List<Transform> bodyParts = new List<Transform>();
 
+    // Lưu vị trí cũ của đầu rắn
+    private Vector3 lastHeadPosition;
+
     void Start()
     {
-        // Ẩn Game Over lúc bắt đầu
-        gameOverPanel.SetActive(false);
-
         // Cho rắn di chuyển liên tục
         InvokeRepeating(nameof(Move), 0.1f, moveDelay);
     }
@@ -61,6 +57,9 @@ public class Snake : MonoBehaviour
 
     void Move()
     {
+        // Lưu vị trí cũ của đầu rắn
+        lastHeadPosition = transform.position;
+
         // Body cuối đi theo body trước
         for (int i = bodyParts.Count - 1; i > 0; i--)
         {
@@ -83,9 +82,10 @@ public class Snake : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Ăn food
+        // ĂN FOOD
         if (other.CompareTag("Food"))
         {
+            // Xóa food cũ
             Destroy(other.gameObject);
 
             // Spawn food mới
@@ -93,14 +93,15 @@ public class Snake : MonoBehaviour
 
             // Tăng chiều dài
             Grow();
+
+            // Tăng điểm
+            FindFirstObjectByType<GameManager>().AddScore(10);
         }
 
-      
-
-        // Chạm tường
-        if (other.CompareTag("Wall"))
+        // CHẠM THÂN HOẶC TƯỜNG
+        if (other.CompareTag("Body") || other.CompareTag("Wall"))
         {
-            GameOver();
+            FindFirstObjectByType<GameManager>().GameOver();
         }
     }
 
@@ -109,36 +110,10 @@ public class Snake : MonoBehaviour
         // Tạo body mới
         Transform newBody = Instantiate(bodyPrefab);
 
-        // Nếu chưa có body
-        if (bodyParts.Count == 0)
-        {
-            newBody.position = transform.position;
-        }
-        else
-        {
-            // Spawn tại vị trí body cuối
-            newBody.position = bodyParts[bodyParts.Count - 1].position;
-        }
+        // Spawn body mới tại vị trí cũ của đầu rắn
+        newBody.position = lastHeadPosition;
 
         // Thêm vào danh sách
         bodyParts.Add(newBody);
-    }
-
-    void GameOver()
-    {
-        // Hiện panel Game Over
-        gameOverPanel.SetActive(true);
-
-        // Dừng game
-        Time.timeScale = 0;
-    }
-
-    public void RestartGame()
-    {
-        // Chạy lại thời gian
-        Time.timeScale = 1;
-
-        // Load lại scene hiện tại
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

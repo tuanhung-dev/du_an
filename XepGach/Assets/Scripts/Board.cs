@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class Board : MonoBehaviour
 {
@@ -143,7 +144,6 @@ public class Board : MonoBehaviour
     {
         for (int x = 0; x < width; x++)
         {
-            // FIX NULL ERROR
             if (grid[x, y] != null)
             {
                 Destroy(grid[x, y].gameObject);
@@ -165,7 +165,7 @@ public class Board : MonoBehaviour
             {
                 if (grid[x, y] != null)
                 {
-                    // Dời dữ liệu trong grid
+                    // Dời dữ liệu grid
                     grid[x, y - 1] = grid[x, y];
 
                     grid[x, y] = null;
@@ -203,5 +203,20 @@ public class Board : MonoBehaviour
         {
             gameOverPanel.SetActive(true);
         }
+    }
+
+    // =====================================================
+    // RESTART GAME
+    // =====================================================
+
+    public void RestartGame()
+    {
+        // Chạy lại thời gian
+        Time.timeScale = 1f;
+
+        // Load lại scene hiện tại
+        SceneManager.LoadScene(
+            SceneManager.GetActiveScene().buildIndex
+        );
     }
 }
