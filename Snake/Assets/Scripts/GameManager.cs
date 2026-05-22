@@ -1,84 +1,190 @@
-using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using TMPro;
+using System.Collections.Generic;
 
 public class GameManager : MonoBehaviour
 {
+    public static GameManager instance;
+
+    // Tốc độ rắn
+    public static float snakeSpeed = 0.2f;
+
+    [Header("Snake")]
+    public Snake snake;
+
     [Header("Panels")]
     public GameObject mainMenuPanel;
+
+    public GameObject difficultyPanel;
+
     public GameObject gameOverPanel;
 
-    [Header("Game Objects")]
-    public GameObject snake;
-    public GameObject foodSpawner;
+    public GameObject winPanel;
 
-    [Header("Score")]
-    public TextMeshProUGUI scoreText;
+    [Header("UI")]
+    public TMP_Text scoreText;
 
-    // Điểm
+    [Header("Obstacle")]
+    public GameObject obstaclePrefab;
+
+    private List<GameObject> obstacles = new List<GameObject>();
+
     private int score = 0;
 
-    // KIỂM TRA RESTART
-    public static bool isRestarting = false;
+    private bool isGameOver = false;
 
-    void Start()
+    private void Awake()
     {
-        // Ẩn game over
-        gameOverPanel.SetActive(false);
-
-        // NẾU ĐANG RESTART
-        if (isRestarting)
-        {
-            StartGame();
-
-            // reset lại
-            isRestarting = false;
-
-            return;
-        }
-
-        // HIỆN MENU LẦN ĐẦU
-        mainMenuPanel.SetActive(true);
-
-        // Tắt gameplay
-        snake.SetActive(false);
-        foodSpawner.SetActive(false);
-
-        // Dừng game
-        Time.timeScale = 0f;
-
-        // Reset score
-        score = 0;
-        UpdateScore();
+        instance = this;
     }
 
-    // START GAME
-    public void StartGame()
+    private void Start()
     {
-        // Ẩn menu
-        mainMenuPanel.SetActive(false);
+        mainMenuPanel.SetActive(true);
 
-        // Hiện gameplay
-        snake.SetActive(true);
-        foodSpawner.SetActive(true);
+        difficultyPanel.SetActive(false);
 
-        // Reset điểm
+        gameOverPanel.SetActive(false);
+
+        winPanel.SetActive(false);
+
+        // Ẩn điểm ở menu
+        scoreText.gameObject.SetActive(false);
+
         score = 0;
+
         UpdateScore();
 
-        // Chạy game
         Time.timeScale = 1f;
     }
 
-    // THÊM ĐIỂM
-    public void AddScore(int amount)
+    // =========================
+    // START GAME
+    // =========================
+
+    public void StartGame()
     {
-        score += amount;
+        mainMenuPanel.SetActive(false);
+
+        difficultyPanel.SetActive(false);
+
+        gameOverPanel.SetActive(false);
+
+        winPanel.SetActive(false);
+
+        // Hiện điểm khi chơi
+        scoreText.gameObject.SetActive(true);
+
+        score = 0;
 
         UpdateScore();
+
+        snake.ResetState();
+
+        isGameOver = false;
+
+        Time.timeScale = 1f;
     }
 
-    // CẬP NHẬT UI SCORE
+    // =========================
+    // OPEN DIFFICULTY
+    // =========================
+
+    public void OpenDifficulty()
+    {
+        difficultyPanel.SetActive(true);
+    }
+
+    // =========================
+    // SPAWN OBSTACLE
+    // =========================
+
+    void SpawnObstacles(int amount)
+    {
+        // Xóa obstacle cũ
+        foreach (GameObject obstacle in obstacles)
+        {
+            Destroy(obstacle);
+        }
+
+        obstacles.Clear();
+
+        // Spawn obstacle mới
+        for (int i = 0; i < amount; i++)
+        {
+            float x = Mathf.Round(Random.Range(-8f, 8f));
+
+            float y = Mathf.Round(Random.Range(-4f, 4f));
+
+            Vector3 position = new Vector3(x, y, 0f);
+
+            GameObject newObstacle = Instantiate(obstaclePrefab, position, Quaternion.identity);
+
+            obstacles.Add(newObstacle);
+        }
+    }
+
+    // =========================
+    // DIFFICULTY
+    // =========================
+
+    public void Easy()
+    {
+        // Chậm - dễ chơi
+        snakeSpeed = 0.22f;
+
+        SpawnObstacles(0);
+
+        difficultyPanel.SetActive(false);
+    }
+
+    public void Medium()
+    {
+        // Bình thường
+        snakeSpeed = 0.18f;
+
+        SpawnObstacles(0);
+
+        difficultyPanel.SetActive(false);
+    }
+
+    public void Hard()
+    {
+        // Khó hơn
+        snakeSpeed = 0.14f;
+
+        SpawnObstacles(5);
+
+        difficultyPanel.SetActive(false);
+    }
+
+    public void VeryHard()
+    {
+        // Rất khó
+        snakeSpeed = 0.11f;
+
+        SpawnObstacles(8);
+
+        difficultyPanel.SetActive(false);
+    }
+
+    // =========================
+    // SCORE
+    // =========================
+
+    public void AddScore(int point)
+    {
+        score += point;
+
+        UpdateScore();
+
+        // Điều kiện thắng
+        if (score >= 100)
+        {
+            WinGame();
+        }
+    }
+
     void UpdateScore()
     {
         if (scoreText != null)
@@ -87,22 +193,94 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // =========================
     // GAME OVER
+    // =========================
+
     public void GameOver()
     {
+        if (isGameOver) return;
+
+        isGameOver = true;
+
         gameOverPanel.SetActive(true);
 
         Time.timeScale = 0f;
     }
 
-    // RESTART GAME
+    // =========================
+    // WIN GAME
+    // =========================
+
+    public void WinGame()
+    {
+        winPanel.SetActive(true);
+
+        Time.timeScale = 0f;
+    }
+
+    // =========================
+    // RESTART
+    // =========================
+
     public void RestartGame()
     {
-        // Đánh dấu đang restart
-        isRestarting = true;
+        gameOverPanel.SetActive(false);
+
+        winPanel.SetActive(false);
+
+        // Hiện lại điểm
+        scoreText.gameObject.SetActive(true);
+
+        score = 0;
+
+        UpdateScore();
+
+        snake.ResetState();
+
+        isGameOver = false;
 
         Time.timeScale = 1f;
+    }
 
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    // =========================
+    // BACK TO MENU
+    // =========================
+
+    public void BackToMenu()
+    {
+        mainMenuPanel.SetActive(true);
+
+        difficultyPanel.SetActive(false);
+
+        gameOverPanel.SetActive(false);
+
+        winPanel.SetActive(false);
+
+        // Ẩn điểm ở menu
+        scoreText.gameObject.SetActive(false);
+
+        // Xóa obstacle khi về menu
+        foreach (GameObject obstacle in obstacles)
+        {
+            Destroy(obstacle);
+        }
+
+        obstacles.Clear();
+
+        score = 0;
+
+        UpdateScore();
+
+        Time.timeScale = 1f;
+    }
+
+    // =========================
+    // QUIT GAME
+    // =========================
+
+    public void QuitGame()
+    {
+        Application.Quit();
     }
 }

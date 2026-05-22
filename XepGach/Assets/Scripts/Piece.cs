@@ -5,24 +5,23 @@ public class Piece : MonoBehaviour
     public Board board;
     public TetrominoData tetrominoData;
 
+    [Header("Fall Settings")]
     public float stepDelay = 1f;
-    private float moveTimer;
 
+    private float moveTimer;
     public int rotationIndex = 0;
 
-    void Start()
+    private void Start()
     {
-        // Tự tìm Board nếu chưa gán
-        if (board == null)
-        {
-            board = FindFirstObjectByType<Board>();
-        }
+        moveTimer = Time.time + stepDelay;
     }
 
-    void Update()
+    private void Update()
     {
-        // Nếu thiếu Board thì tránh lỗi
-        if (board == null) return;
+        if (!CanControlPiece())
+        {
+            return;
+        }
 
         // Rơi tự động
         if (Time.time >= moveTimer)
@@ -31,20 +30,20 @@ public class Piece : MonoBehaviour
             moveTimer = Time.time + stepDelay;
         }
 
-        // Điều khiển bàn phím
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        // Điều khiển bằng bàn phím
+        if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A))
         {
             Move(Vector2Int.left);
         }
-        else if (Input.GetKeyDown(KeyCode.RightArrow))
+        else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D))
         {
             Move(Vector2Int.right);
         }
-        else if (Input.GetKeyDown(KeyCode.DownArrow))
+        else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
         {
-            Move(Vector2Int.down);
+            SoftDrop();
         }
-        else if (Input.GetKeyDown(KeyCode.UpArrow))
+        else if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
         {
             Rotate();
         }
@@ -63,46 +62,79 @@ public class Piece : MonoBehaviour
         }
     }
 
+    private bool CanControlPiece()
+    {
+        if (!enabled) return false;
+
+        if (GameManager.Instance != null &&
+            GameManager.Instance.currentState != GameState.Playing)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     // =====================================================
-    // MOBILE BUTTONS
+    // HÀM PUBLIC CHO NÚT MOBILE
     // =====================================================
 
     public void MoveLeft()
     {
+        if (!CanControlPiece()) return;
         Move(Vector2Int.left);
     }
 
     public void MoveRight()
     {
+        if (!CanControlPiece()) return;
         Move(Vector2Int.right);
     }
 
     public void SoftDrop()
     {
+        if (!CanControlPiece()) return;
+
         if (Move(Vector2Int.down))
         {
             moveTimer = Time.time + stepDelay;
         }
     }
 
-    // =====================================================
-    // MOVE
-    // =====================================================
-
-    bool Move(Vector2Int translation)
+    public void HardDrop()
     {
-        if (!this.enabled || board == null) return false;
+        if (!CanControlPiece()) return;
 
-        Vector3 newPos = transform.position;
-
-        newPos.x += translation.x;
-        newPos.y += translation.y;
-
-        transform.position = newPos;
-
-        if (!board.IsValidPosition(this.transform))
+        while (board.IsValidPosition(transform))
         {
-            transform.position -= new Vector3(translation.x, translation.y, 0);
+            transform.position += Vector3.down;
+        }
+
+        transform.position += Vector3.up;
+
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.PlaySFX(AudioManager.instance.hardDropSound);
+        }
+
+        Lock();
+    }
+
+    // =====================================================
+    // DI CHUYỂN
+    // =====================================================
+
+    private bool Move(Vector2Int translation)
+    {
+        if (!enabled) return false;
+
+        Vector3 oldPosition = transform.position;
+
+        transform.position += new Vector3(translation.x, translation.y, 0f);
+
+        if (!board.IsValidPosition(transform))
+        {
+            transform.position = oldPosition;
 
             if (translation == Vector2Int.down)
             {
@@ -112,142 +144,104 @@ public class Piece : MonoBehaviour
             return false;
         }
 
+        if (translation != Vector2Int.down)
+        {
+            if (AudioManager.instance != null)
+            {
+                AudioManager.instance.PlaySFX(AudioManager.instance.moveSound);
+            }
+        }
+
         return true;
     }
 
     // =====================================================
-    // ROTATE
+    // XOAY KHỐI
     // =====================================================
 
     public void Rotate()
     {
-        if (!this.enabled) return;
+        if (!CanControlPiece()) return;
 
-        if (board == null) return;
+        int oldRotationIndex = rotationIndex;
+        Vector3 oldPosition = transform.position;
 
-        // Lưu trạng thái cũ
-        int originalRotation = rotationIndex;
-        Vector3 originalPos = transform.position;
-
-        // Xoay thử
         rotationIndex = (rotationIndex + 1) % 4;
+        transform.eulerAngles -= new Vector3(0f, 0f, 90f);
 
-        transform.eulerAngles -= new Vector3(0, 0, 90);
+        bool canRotate = TestWallKicks(rotationIndex);
 
-        bool wallKickSuccess = TestWallKicks(rotationIndex);
-
-        // Âm thanh xoay
-        if (AudioManager.instance != null)
+        if (!canRotate)
         {
-            AudioManager.instance.PlaySFX(AudioManager.instance.moveSound);
+            rotationIndex = oldRotationIndex;
+            transform.position = oldPosition;
+            transform.eulerAngles += new Vector3(0f, 0f, 90f);
         }
-
-        // Nếu xoay thất bại thì trả lại
-        if (!wallKickSuccess)
+        else
         {
-            rotationIndex = originalRotation;
-
-            transform.position = originalPos;
-
-            transform.eulerAngles += new Vector3(0, 0, 90);
+            if (AudioManager.instance != null)
+            {
+                AudioManager.instance.PlaySFX(AudioManager.instance.moveSound);
+            }
         }
     }
 
-    // =====================================================
-    // WALL KICK
-    // =====================================================
-
     private bool TestWallKicks(int targetRotationIndex)
     {
-        if (board == null) return false;
-
-        Vector2Int[,] wallKicksData;
-
-        // Gạch O không cần wall kick
         if (tetrominoData.type == TetrominoType.O)
         {
             return true;
         }
-        // Gạch I dùng bảng riêng
-        else if (tetrominoData.type == TetrominoType.I)
+
+        Vector2Int[,] wallKicksData;
+
+        if (tetrominoData.type == TetrominoType.I)
         {
             wallKicksData = Data.WallKicksI;
         }
-        // Các gạch còn lại
         else
         {
             wallKicksData = Data.WallKicksJLOSTZ;
         }
 
-        // Thử 5 vị trí wall kick
         for (int i = 0; i < 5; i++)
         {
-            Vector2Int translation =
-                wallKicksData[targetRotationIndex, i];
+            Vector2Int translation = wallKicksData[targetRotationIndex, i];
 
-            transform.position +=
-                new Vector3(translation.x, translation.y, 0);
+            transform.position += new Vector3(translation.x, translation.y, 0f);
 
-            if (board.IsValidPosition(this.transform))
+            if (board.IsValidPosition(transform))
             {
                 return true;
             }
 
-            transform.position -=
-                new Vector3(translation.x, translation.y, 0);
+            transform.position -= new Vector3(translation.x, translation.y, 0f);
         }
 
         return false;
     }
 
     // =====================================================
-    // HARD DROP
+    // KHÓA KHỐI GẠCH
     // =====================================================
 
-    public void HardDrop()
+    private void Lock()
     {
-        if (!this.enabled || board == null) return;
+        if (!enabled) return;
 
-        while (board.IsValidPosition(this.transform))
-        {
-            transform.position += Vector3.down;
-        }
+        board.AddToGrid(transform);
 
-        transform.position += Vector3.up;
-
-        // Âm thanh hard drop
-        if (AudioManager.instance != null)
-        {
-            AudioManager.instance.PlaySFX(
-                AudioManager.instance.hardDropSound
-            );
-        }
-
-        Lock();
-    }
-
-    // =====================================================
-    // LOCK
-    // =====================================================
-
-    void Lock()
-    {
-        if (board == null) return;
-
-        foreach (Transform child in transform)
-        {
-            Vector2Int pos =
-                Vector2Int.RoundToInt(child.position);
-
-            board.grid[pos.x, pos.y] = child;
-        }
-
-        this.enabled = false;
+        enabled = false;
 
         board.CheckForLines();
 
-        Spawner spawner =
-            FindFirstObjectByType<Spawner>();
+        if (GameManager.Instance != null &&
+            GameManager.Instance.currentState == GameState.GameOver)
+        {
+            return;
+        }
+
+        Spawner spawner = FindFirstObjectByType<Spawner>();
 
         if (spawner != null)
         {

@@ -2,25 +2,33 @@ using UnityEngine;
 
 public class FoodSpawner : MonoBehaviour
 {
+    // Food prefab
     public GameObject foodPrefab;
 
+    // Food hiện tại
+    private GameObject currentFood;
+
+    // Spawn food
     public void SpawnFood()
     {
-        Vector2 randomPosition;
-
-        do
+        // Xóa food cũ
+        if (currentFood != null)
         {
-            randomPosition = new Vector2(
-                Random.Range(-5, 5),
-                Random.Range(-5, 5)
-            );
+            Destroy(currentFood);
+        }
 
-        } while (Physics2D.OverlapCircle(randomPosition, 0.2f));
+        // Random vị trí
+        float x = Mathf.Round(Random.Range(-8f, 8f));
 
-        Instantiate(foodPrefab, randomPosition, Quaternion.identity);
+        float y = Mathf.Round(Random.Range(-4f, 4f));
+
+        Vector3 randomPosition = new Vector3(x, y, 0f);
+
+        // Spawn food mới
+        currentFood = Instantiate(foodPrefab, randomPosition, Quaternion.identity);
     }
 
-    void Start()
+    private void Start()
     {
         SpawnFood();
     }

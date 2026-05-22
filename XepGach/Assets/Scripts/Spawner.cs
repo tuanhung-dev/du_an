@@ -2,62 +2,61 @@
 
 public class Spawner : MonoBehaviour
 {
+    [Header("References")]
     public Board board;
+    public Ghost ghost;
+
+    [Header("Tetromino Data")]
     public TetrominoData[] tetrominoes;
 
+    [Header("Spawn")]
     public Vector3 spawnPosition = new Vector3(4f, 18f, 0f);
-
     public Piece activePiece;
-    public Ghost ghost;
 
     [Header("UI Preview Settings")]
     public float previewScale = 0.5f;
 
-    [Header("Next & Hold Settings")]
+    [Header("Next Settings")]
     public Transform[] nextPositions;
+
+    [Header("Hold Settings")]
+    public Transform holdPosition;
 
     private TetrominoData[] nextQueue = new TetrominoData[3];
     private GameObject[] nextPreviews = new GameObject[3];
-
-    public Transform holdPosition;
 
     private TetrominoData holdData;
     private GameObject holdPreview;
 
     private bool canHold = true;
     private bool hasHeldPiece = false;
+    private bool hasStarted = false;
 
-    void Start()
+    // GameManager sẽ gọi hàm này khi bấm Play
+    public void StartNewGame()
     {
-        // Tự tìm Board nếu chưa gán
-        if (board == null)
-        {
-            board = FindFirstObjectByType<Board>();
-        }
+        if (hasStarted) return;
 
-        // Tạo queue ban đầu
-        for (int i = 0; i < 3; i++)
+        hasStarted = true;
+
+        for (int i = 0; i < nextQueue.Length; i++)
         {
-            nextQueue[i] = tetrominoes[Random.Range(0, tetrominoes.Length)];
+            nextQueue[i] = GetRandomTetromino();
         }
 
         UpdateNextQueueUI();
-
         SpawnPiece();
     }
 
-    // =====================================================
-    // SPAWN PIECE
-    // =====================================================
-
     public void SpawnPiece()
     {
+        if (!hasStarted) return;
+
         TetrominoData data = nextQueue[0];
 
-        // Đẩy queue
         nextQueue[0] = nextQueue[1];
         nextQueue[1] = nextQueue[2];
-        nextQueue[2] = tetrominoes[Random.Range(0, tetrominoes.Length)];
+        nextQueue[2] = GetRandomTetromino();
 
         UpdateNextQueueUI();
 
@@ -66,58 +65,38 @@ public class Spawner : MonoBehaviour
         canHold = true;
     }
 
-    // =====================================================
-    // TẠO GẠCH
-    // =====================================================
+    private TetrominoData GetRandomTetromino()
+    {
+        return tetrominoes[Random.Range(0, tetrominoes.Length)];
+    }
 
     private void InstantiateAndSetup(TetrominoData data)
     {
-        GameObject pieceObj =
-            Instantiate(data.prefab, spawnPosition, Quaternion.identity);
+        GameObject pieceObj = Instantiate(data.prefab, spawnPosition, Quaternion.identity);
 
         Piece piece = pieceObj.GetComponent<Piece>();
 
-        // GÁN DỮ LIỆU QUAN TRỌNG
         piece.board = board;
+        piece.stepDelay = board.currentFallSpeed;
         piece.tetrominoData = data;
-
-        // Tốc độ rơi
-        if (board != null)
-        {
-            piece.stepDelay = board.currentFallSpeed;
-        }
 
         activePiece = piece;
 
-        // Ghost
         if (ghost != null)
         {
             ghost.TrackPiece(piece);
         }
 
-        // Check Game Over
-        if (board != null &&
-            !board.IsValidPosition(pieceObj.transform))
+        if (!board.IsValidPosition(pieceObj.transform))
         {
-            Debug.Log("GAME OVER!");
-
             Destroy(pieceObj);
-
             board.GameOver();
         }
     }
 
-    // =====================================================
-    // HOLD
-    // =====================================================
-
     public void Hold()
     {
-        if (Time.timeScale == 0f) return;
-
-        if (!canHold) return;
-
-        if (activePiece == null) return;
+        if (!CanUseHold()) return;
 
         TetrominoData currentData = activePiece.tetrominoData;
 
@@ -126,7 +105,6 @@ public class Spawner : MonoBehaviour
         if (!hasHeldPiece)
         {
             holdData = currentData;
-
             hasHeldPiece = true;
 
             SpawnPiece();
@@ -134,7 +112,6 @@ public class Spawner : MonoBehaviour
         else
         {
             TetrominoData temp = holdData;
-
             holdData = currentData;
 
             InstantiateAndSetup(temp);
@@ -145,46 +122,57 @@ public class Spawner : MonoBehaviour
         canHold = false;
     }
 
-    // =====================================================
-    // NEXT UI
-    // =====================================================
+    private bool CanUseHold()
+    {
+        if (!hasStarted) return false;
+        if (!canHold) return false;
+        if (activePiece == null) return false;
+        if (!activePiece.enabled) return false;
+
+        if (GameManager.Instance != null &&
+            GameManager.Instance.currentState != GameState.Playing)
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     private void UpdateNextQueueUI()
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < nextPreviews.Length; i++)
         {
-            // Xóa preview cũ
             if (nextPreviews[i] != null)
             {
                 Destroy(nextPreviews[i]);
             }
 
-            // Tạo preview mới
-            nextPreviews[i] =
-                Instantiate(
-                    nextQueue[i].prefab,
-                    nextPositions[i].position,
-                    Quaternion.identity
-                );
+            if (nextPositions == null || i >= nextPositions.Length)
+            {
+                continue;
+            }
 
-            // Tắt script Piece để preview không hoạt động
-            Piece previewPiece =
-                nextPreviews[i].GetComponent<Piece>();
+            if (nextPositions[i] == null || nextQueue[i].prefab == null)
+            {
+                continue;
+            }
+            nextPreviews[i] = Instantiate(
+                nextQueue[i].prefab,
+                nextPositions[i].position,
+                Quaternion.identity
+            );
+
+            Piece previewPiece = nextPreviews[i].GetComponent<Piece>();
 
             if (previewPiece != null)
             {
                 previewPiece.enabled = false;
             }
 
-            // Thu nhỏ preview
             nextPreviews[i].transform.localScale =
                 new Vector3(previewScale, previewScale, 1f);
         }
     }
-
-    // =====================================================
-    // HOLD UI
-    // =====================================================
 
     private void UpdateHoldUI()
     {
@@ -193,15 +181,18 @@ public class Spawner : MonoBehaviour
             Destroy(holdPreview);
         }
 
-        holdPreview =
-            Instantiate(
-                holdData.prefab,
-                holdPosition.position,
-                Quaternion.identity
-            );
+        if (holdPosition == null || !hasHeldPiece || holdData.prefab == null)
+        {
+            return;
+        }
 
-        Piece previewPiece =
-            holdPreview.GetComponent<Piece>();
+        holdPreview = Instantiate(
+            holdData.prefab,
+            holdPosition.position,
+            Quaternion.identity
+        );
+
+        Piece previewPiece = holdPreview.GetComponent<Piece>();
 
         if (previewPiece != null)
         {
@@ -212,51 +203,39 @@ public class Spawner : MonoBehaviour
             new Vector3(previewScale, previewScale, 1f);
     }
 
-    // =====================================================
-    // MOBILE BUTTONS
-    // =====================================================
-
     public void OnRotateButtonClicked()
     {
-        if (Time.timeScale == 0f) return;
-
         if (activePiece == null) return;
-
-        if (!activePiece.enabled) return;
 
         activePiece.Rotate();
     }
 
     public void OnLeftButtonClicked()
     {
-        if (activePiece != null)
-        {
-            activePiece.MoveLeft();
-        }
+        if (activePiece == null) return;
+
+        activePiece.MoveLeft();
     }
 
     public void OnRightButtonClicked()
     {
-        if (activePiece != null)
-        {
-            activePiece.MoveRight();
-        }
+        if (activePiece == null) return;
+
+        activePiece.MoveRight();
     }
 
-    public void OnDownButtonClicked()
+    public void OnSoftDropButtonClicked()
     {
-        if (activePiece != null)
-        {
-            activePiece.SoftDrop();
-        }
+        if (activePiece == null) return;
+
+        activePiece.SoftDrop();
     }
 
-    public void OnDropButtonClicked()
+    public void OnHardDropButtonClicked()
     {
-        if (activePiece != null)
-        {
-            activePiece.HardDrop();
-        }
+        if (activePiece == null) return;
+
+        activePiece.HardDrop();
     }
 
     public void OnHoldButtonClicked()

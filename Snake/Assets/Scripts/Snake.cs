@@ -6,114 +6,141 @@ public class Snake : MonoBehaviour
     // Hướng di chuyển
     private Vector2 direction = Vector2.right;
 
-    // Tốc độ di chuyển
+    // Tốc độ
     public float moveDelay = 0.2f;
 
     // Prefab thân rắn
     public Transform bodyPrefab;
 
-    // Danh sách thân rắn
+    // Danh sách thân
     private List<Transform> bodyParts = new List<Transform>();
 
-    // Lưu vị trí cũ của đầu rắn
-    private Vector3 lastHeadPosition;
+    // Vị trí ban đầu
+    private Vector3 startPosition;
 
-    void Start()
+    // Biến kiểm tra ăn food
+    private bool shouldGrow = false;
+
+    private void Start()
     {
-        // Cho rắn di chuyển liên tục
-        InvokeRepeating(nameof(Move), 0.1f, moveDelay);
+        startPosition = transform.position;
+
+        ResetState();
     }
 
-    void Update()
+    private void Update()
     {
-        // LÊN
-        if ((Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
-            && direction != Vector2.down)
+        // Điều khiển
+        if (Input.GetKeyDown(KeyCode.W) && direction != Vector2.down)
         {
             direction = Vector2.up;
         }
-
-        // XUỐNG
-        if ((Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
-            && direction != Vector2.up)
+        else if (Input.GetKeyDown(KeyCode.S) && direction != Vector2.up)
         {
             direction = Vector2.down;
         }
-
-        // TRÁI
-        if ((Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
-            && direction != Vector2.right)
+        else if (Input.GetKeyDown(KeyCode.A) && direction != Vector2.right)
         {
             direction = Vector2.left;
         }
-
-        // PHẢI
-        if ((Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
-            && direction != Vector2.left)
+        else if (Input.GetKeyDown(KeyCode.D) && direction != Vector2.left)
         {
             direction = Vector2.right;
         }
     }
 
-    void Move()
+    private void Move()
     {
-        // Lưu vị trí cũ của đầu rắn
-        lastHeadPosition = transform.position;
+        // Nếu ăn food -> tạo thân ở cuối đuôi
+        if (shouldGrow)
+        {
+            Grow();
 
-        // Body cuối đi theo body trước
+            shouldGrow = false;
+        }
+
+        // Di chuyển thân
         for (int i = bodyParts.Count - 1; i > 0; i--)
         {
             bodyParts[i].position = bodyParts[i - 1].position;
         }
 
-        // Body đầu đi theo đầu rắn
-        if (bodyParts.Count > 0)
+        // Di chuyển đầu
+        transform.position += new Vector3(direction.x, direction.y, 0);
+    }
+
+    // Tạo thân mới
+    private void Grow()
+    {
+        Transform body = Instantiate(bodyPrefab);
+
+        body.position = bodyParts[bodyParts.Count - 1].position;
+
+        body.tag = "Body";
+
+        bodyParts.Add(body);
+    }
+
+    // Reset game
+    public void ResetState()
+    {
+        CancelInvoke();
+
+        direction = Vector2.right;
+
+        transform.position = startPosition;
+
+        // Xóa thân cũ
+        for (int i = 1; i < bodyParts.Count; i++)
         {
-            bodyParts[0].position = transform.position;
+            Destroy(bodyParts[i].gameObject);
         }
 
-        // Đầu rắn di chuyển
-        transform.position = new Vector3(
-            transform.position.x + direction.x,
-            transform.position.y + direction.y,
-            0
-        );
+        bodyParts.Clear();
+
+        bodyParts.Add(transform);
+
+        shouldGrow = false;
+
+        moveDelay = GameManager.snakeSpeed;
+
+        InvokeRepeating(nameof(Move), moveDelay, moveDelay);
+
+        // Spawn food
+        FoodSpawner spawner = FindObjectOfType<FoodSpawner>();
+
+        if (spawner != null)
+        {
+            spawner.SpawnFood();
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // ĂN FOOD
+        // Ăn food
         if (other.CompareTag("Food"))
         {
-            // Xóa food cũ
             Destroy(other.gameObject);
 
-            // Spawn food mới
-            FindFirstObjectByType<FoodSpawner>().SpawnFood();
-
-            // Tăng chiều dài
-            Grow();
+            // Chỉ đánh dấu sẽ tăng thân
+            shouldGrow = true;
 
             // Tăng điểm
-            FindFirstObjectByType<GameManager>().AddScore(10);
+            GameManager.instance.AddScore(10);
+
+            // Spawn food mới
+            FoodSpawner spawner = FindObjectOfType<FoodSpawner>();
+
+            if (spawner != null)
+            {
+                spawner.SpawnFood();
+            }
         }
 
-        // CHẠM THÂN HOẶC TƯỜNG
-        if (other.CompareTag("Body") || other.CompareTag("Wall"))
+        // Chạm tường hoặc thân
+        if (other.CompareTag("Wall") || other.CompareTag("Body"))
         {
-            FindFirstObjectByType<GameManager>().GameOver();
+            GameManager.instance.GameOver();
         }
-    }
-
-    void Grow()
-    {
-        // Tạo body mới
-        Transform newBody = Instantiate(bodyPrefab);
-
-        // Spawn body mới tại vị trí cũ của đầu rắn
-        newBody.position = lastHeadPosition;
-
-        // Thêm vào danh sách
-        bodyParts.Add(newBody);
     }
 }

@@ -2,23 +2,21 @@
 
 public class AudioManager : MonoBehaviour
 {
-    //Biến static để các script khác có thể gọi dễ dàng(như gọi tổng đài)
     public static AudioManager instance;
 
-    [Header("Dàn loa")]
-    public AudioSource bgmSource;//Loa phát nhạc nền(Hát liên tục)
-    public AudioSource sfxSource;//Loa phát tiếng động(kêu 1 lần rồi thôi)
+    [Header("Audio Sources")]
+    public AudioSource bgmSource;
+    public AudioSource sfxSource;
 
-    [Header("Băng đĩa(Audio Clips)")]
-    public AudioClip moveSound;// Tiếng xê dịch, xoay
-    public AudioClip hardDropSound; //Tiếng gạch rơi xuống đáy
-    public AudioClip clearLineSound; // Tiếng nổ ăn hàng
-    public AudioClip gameOverSound;// Tiếng tèo
+    [Header("Audio Clips")]
+    public AudioClip moveSound;
+    public AudioClip hardDropSound;
+    public AudioClip clearLineSound;
+    public AudioClip gameOverSound;
 
     private void Awake()
     {
-        // Setup để gọi từ xa
-        if(instance == null)
+        if (instance == null)
         {
             instance = this;
         }
@@ -28,17 +26,28 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    //Hàm gọi tiếng động
-    public void PlaySFX(AudioClip clip)
+    public void PlayBGM()
     {
-        if(clip != null)
+        if (bgmSource == null) return;
+
+        if (!bgmSource.isPlaying)
         {
-            sfxSource.PlayOneShot(clip);
+            bgmSource.Play();
         }
     }
-    //Hàm tắt nhạc nên khi chết
+
     public void StopBGM()
     {
+        if (bgmSource == null) return;
+
         bgmSource.Stop();
+    }
+
+    public void PlaySFX(AudioClip clip)
+    {
+        if (sfxSource == null) return;
+        if (clip == null) return;
+
+        sfxSource.PlayOneShot(clip);
     }
 }

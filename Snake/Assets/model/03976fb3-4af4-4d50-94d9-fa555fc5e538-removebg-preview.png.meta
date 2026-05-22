@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ec7a035282977ac43be03f3a88296069
+guid: bc276f78ede6b69478c744b2e662620b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5875664993436489352
-    second: "t\u1EA3i xu\u1ED1ng_0"
+      213: -5980291398951979847
+    second: 03976fb3-4af4-4d50-94d9-fa555fc5e538-removebg-preview_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: "t\u1EA3i xu\u1ED1ng_0"
+      name: 03976fb3-4af4-4d50-94d9-fa555fc5e538-removebg-preview_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 275
-        height: 183
+        x: 36
+        y: 44
+        width: 505
+        height: 357
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 879250fa1d1757ea0800000000000000
-      internalID: -5875664993436489352
+      spriteID: 9b4b42858acb10da0800000000000000
+      internalID: -5980291398951979847
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      "t\u1EA3i xu\u1ED1ng_0": -5875664993436489352
+      03976fb3-4af4-4d50-94d9-fa555fc5e538-removebg-preview_0: -5980291398951979847
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

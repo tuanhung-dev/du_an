@@ -2,18 +2,20 @@
 
 public class SwipeController : MonoBehaviour
 {
-    public Spawner spawner; // Để mượn viên gạch đang rơi
+    public Spawner spawner;
 
     private Vector2 startTouchPosition;
-    private Vector2 currentTouchPosition;
+    private Vector2 endTouchPosition;
+
     private bool isSwiping = false;
 
-    // Khoảng cách tối thiểu để hệ thống công nhận đây là một cú "Vuốt" (tránh chạm nhầm)
-    private float minSwipeDistance = 50f;
+    [Header("Swipe Settings")]
+    public float minSwipeDistance = 50f;
 
-    void Update()
+    private void Update()
     {
-        // Dùng GetMouseButton cho tiện vì nó nhận cả Chuột (trên PC) và Ngón tay (trên Điện thoại)
+        if (!CanUseTouch()) return;
+
         if (Input.GetMouseButtonDown(0))
         {
             isSwiping = true;
@@ -23,46 +25,65 @@ public class SwipeController : MonoBehaviour
         if (Input.GetMouseButtonUp(0) && isSwiping)
         {
             isSwiping = false;
-            currentTouchPosition = Input.mousePosition;
+            endTouchPosition = Input.mousePosition;
+
             AnalyzeTouch();
         }
     }
 
-    void AnalyzeTouch()
+    private bool CanUseTouch()
     {
-        // Chặn luồng nếu không có gạch hoặc đang Game Over
-        if (spawner.activePiece == null || !spawner.activePiece.enabled || Time.timeScale == 0f) return;
+        if (spawner == null) return false;
+        if (spawner.activePiece == null) return false;
+        if (!spawner.activePiece.enabled) return false;
 
-        Vector2 swipeDelta = currentTouchPosition - startTouchPosition;
+        if (GameManager.Instance != null &&
+            GameManager.Instance.currentState != GameState.Playing)
+        {
+            return false;
+        }
 
-        // KIỂM TRA: LÀ VUỐT HAY LÀ CHẠM?
+        return true;
+    }
+
+    private void AnalyzeTouch()
+    {
+        Vector2 swipeDelta = endTouchPosition - startTouchPosition;
+
         if (swipeDelta.magnitude > minSwipeDistance)
         {
-            // --- XỬ LÝ VUỐT (SWIPE) ---
-            // Kiểm tra xem vuốt dọc hay ngang (Ở đây mình chỉ quan tâm vuốt dọc theo đề bài)
+            // Vuốt dọc
             if (Mathf.Abs(swipeDelta.y) > Mathf.Abs(swipeDelta.x))
             {
                 if (swipeDelta.y > 0)
                 {
-                    // Vuốt Lên -> Ném thẳng xuống đáy!
                     spawner.activePiece.HardDrop();
                 }
                 else
                 {
-                    // Vuốt Xuống -> Rơi nhanh (Soft Drop)
                     spawner.activePiece.SoftDrop();
+                }
+            }
+            else
+            {
+                // Vuốt ngang
+                if (swipeDelta.x > 0)
+                {
+                    spawner.activePiece.MoveRight();
+                }
+                else
+                {
+                    spawner.activePiece.MoveLeft();
                 }
             }
         }
         else
         {
-            // --- XỬ LÝ CHẠM (TAP) ---
-            // Nếu điểm chạm nằm ở nửa trái màn hình -> Sang trái
-            if (currentTouchPosition.x < Screen.width / 2)
+            // Tap nửa trái / nửa phải màn hình
+            if (endTouchPosition.x < Screen.width / 2f)
             {
                 spawner.activePiece.MoveLeft();
             }
-            // Điểm chạm nửa phải -> Sang phải
             else
             {
                 spawner.activePiece.MoveRight();
