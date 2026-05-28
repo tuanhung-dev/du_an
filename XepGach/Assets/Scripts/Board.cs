@@ -13,7 +13,6 @@ public class Board : MonoBehaviour
     [Header("Score UI")]
     public TMP_Text scoreText;
     public TMP_Text maxScoreText;
-    public TMP_Text linesText;
     public TMP_Text levelText;
 
     [Header("Level Settings")]
@@ -23,6 +22,7 @@ public class Board : MonoBehaviour
 
     private int score = 0;
     private int highScore = 0;
+    private bool isGameOver = false;
 
     public int Score => score;
     public int HighScore => highScore;
@@ -32,7 +32,6 @@ public class Board : MonoBehaviour
     private void Awake()
     {
         grid = new Transform[width, height];
-
         highScore = PlayerPrefs.GetInt("HighScore", 0);
     }
 
@@ -51,19 +50,16 @@ public class Board : MonoBehaviour
         {
             Vector2Int pos = Vector2Int.RoundToInt(child.position);
 
-            // Ra ngoài trái / phải
             if (pos.x < 0 || pos.x >= width)
             {
                 return false;
             }
 
-            // Rơi xuống dưới đáy
             if (pos.y < 0)
             {
                 return false;
             }
 
-            // Nếu nằm trong board thì kiểm tra có bị trùng gạch không
             if (pos.y < height)
             {
                 if (grid[pos.x, pos.y] != null &&
@@ -83,11 +79,12 @@ public class Board : MonoBehaviour
 
     public void AddToGrid(Transform piece)
     {
+        if (isGameOver) return;
+
         foreach (Transform child in piece)
         {
             Vector2Int pos = Vector2Int.RoundToInt(child.position);
 
-            // Nếu gạch bị khóa ở phía trên màn hình thì game over
             if (pos.y >= height)
             {
                 GameOver();
@@ -107,6 +104,8 @@ public class Board : MonoBehaviour
 
     public void CheckForLines()
     {
+        if (isGameOver) return;
+
         int clearedLines = 0;
 
         for (int y = 0; y < height; y++)
@@ -134,7 +133,7 @@ public class Board : MonoBehaviour
     }
 
     // =====================================================
-    // KIỂM TRA 1 HÀNG CÓ FULL KHÔNG
+    // KIỂM TRA HÀNG FULL
     // =====================================================
 
     private bool IsLineFull(int y)
@@ -167,7 +166,7 @@ public class Board : MonoBehaviour
     }
 
     // =====================================================
-    // DỜI CÁC HÀNG PHÍA TRÊN XUỐNG
+    // DỜI HÀNG XUỐNG
     // =====================================================
 
     private void MoveLinesDown(int startY)
@@ -189,30 +188,12 @@ public class Board : MonoBehaviour
 
     // =====================================================
     // TÍNH ĐIỂM
+    // Mỗi dòng = 10 điểm
     // =====================================================
 
     private void AddScore(int clearedLines)
     {
-        int addScore = 0;
-
-        switch (clearedLines)
-        {
-            case 1:
-                addScore = 100;
-                break;
-
-            case 2:
-                addScore = 300;
-                break;
-
-            case 3:
-                addScore = 500;
-                break;
-
-            default:
-                addScore = 800;
-                break;
-        }
+        int addScore = clearedLines * 10;
 
         score += addScore;
 
@@ -224,6 +205,8 @@ public class Board : MonoBehaviour
         }
 
         UpdateScoreUI();
+
+        Debug.Log("Score: " + score);
     }
 
     // =====================================================
@@ -240,13 +223,11 @@ public class Board : MonoBehaviour
         {
             level = newLevel;
 
-            // Level càng cao, gạch rơi càng nhanh
             currentFallSpeed = Mathf.Max(0.1f, 1f - ((level - 1) * 0.1f));
 
             Debug.Log("Level Up: " + level + " | Fall Speed: " + currentFallSpeed);
         }
 
-        UpdateLinesUI();
         UpdateLevelUI();
     }
 
@@ -254,10 +235,9 @@ public class Board : MonoBehaviour
     // UPDATE UI
     // =====================================================
 
-    private void UpdateAllUI()
+    public void UpdateAllUI()
     {
         UpdateScoreUI();
-        UpdateLinesUI();
         UpdateLevelUI();
     }
 
@@ -271,14 +251,6 @@ public class Board : MonoBehaviour
         if (maxScoreText != null)
         {
             maxScoreText.text = highScore.ToString();
-        }
-    }
-
-    private void UpdateLinesUI()
-    {
-        if (linesText != null)
-        {
-            linesText.text = totalLinesCleared.ToString();
         }
     }
 
@@ -308,6 +280,10 @@ public class Board : MonoBehaviour
 
     public void GameOver()
     {
+        if (isGameOver) return;
+
+        isGameOver = true;
+
         if (AudioManager.instance != null)
         {
             AudioManager.instance.StopBGM();

@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
@@ -6,11 +7,22 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager instance;
 
-    // Tốc độ rắn
+    // =========================
+    // SNAKE SPEED
+    // =========================
+
     public static float snakeSpeed = 0.2f;
+
+    // =========================
+    // SNAKE
+    // =========================
 
     [Header("Snake")]
     public Snake snake;
+
+    // =========================
+    // PANELS
+    // =========================
 
     [Header("Panels")]
     public GameObject mainMenuPanel;
@@ -19,24 +31,49 @@ public class GameManager : MonoBehaviour
 
     public GameObject gameOverPanel;
 
-    public GameObject winPanel;
+    // =========================
+    // UI
+    // =========================
 
     [Header("UI")]
     public TMP_Text scoreText;
 
+    public TMP_Text highScoreText;
+
+    // =========================
+    // OBSTACLE
+    // =========================
+
     [Header("Obstacle")]
     public GameObject obstaclePrefab;
 
-    private List<GameObject> obstacles = new List<GameObject>();
+    private List<GameObject> obstacles =
+        new List<GameObject>();
+
+    // =========================
+    // GAME DATA
+    // =========================
 
     private int score = 0;
 
+    private int highScore = 0;
+
     private bool isGameOver = false;
+
+    private int currentObstacleAmount = 0;
+
+    // =========================
+    // AWAKE
+    // =========================
 
     private void Awake()
     {
         instance = this;
     }
+
+    // =========================
+    // START
+    // =========================
 
     private void Start()
     {
@@ -46,10 +83,19 @@ public class GameManager : MonoBehaviour
 
         gameOverPanel.SetActive(false);
 
-        winPanel.SetActive(false);
+        // Ẩn UI điểm khi ở menu
+        if (scoreText != null)
+        {
+            scoreText.gameObject.SetActive(false);
+        }
 
-        // Ẩn điểm ở menu
-        scoreText.gameObject.SetActive(false);
+        if (highScoreText != null)
+        {
+            highScoreText.gameObject.SetActive(false);
+        }
+
+        // High Score luôn bắt đầu từ 0
+        highScore = 0;
 
         score = 0;
 
@@ -70,16 +116,26 @@ public class GameManager : MonoBehaviour
 
         gameOverPanel.SetActive(false);
 
-        winPanel.SetActive(false);
+        // Hiện UI điểm
+        if (scoreText != null)
+        {
+            scoreText.gameObject.SetActive(true);
+        }
 
-        // Hiện điểm khi chơi
-        scoreText.gameObject.SetActive(true);
+        if (highScoreText != null)
+        {
+            highScoreText.gameObject.SetActive(true);
+        }
 
         score = 0;
 
         UpdateScore();
 
+        // Reset rắn
         snake.ResetState();
+
+        // Spawn obstacle
+        SpawnObstacles(currentObstacleAmount);
 
         isGameOver = false;
 
@@ -96,29 +152,70 @@ public class GameManager : MonoBehaviour
     }
 
     // =========================
-    // SPAWN OBSTACLE
+    // SPAWN OBSTACLES
     // =========================
 
     void SpawnObstacles(int amount)
     {
         // Xóa obstacle cũ
-        foreach (GameObject obstacle in obstacles)
+        foreach (GameObject obstacle
+            in obstacles)
         {
             Destroy(obstacle);
         }
 
         obstacles.Clear();
 
-        // Spawn obstacle mới
+        if (obstaclePrefab == null)
+        {
+            return;
+        }
+
         for (int i = 0; i < amount; i++)
         {
-            float x = Mathf.Round(Random.Range(-8f, 8f));
+            bool validPosition = false;
 
-            float y = Mathf.Round(Random.Range(-4f, 4f));
+            Vector3 spawnPosition = Vector3.zero;
 
-            Vector3 position = new Vector3(x, y, 0f);
+            while (!validPosition)
+            {
+                float x =
+                    Mathf.Round(Random.Range(-7f, 7f));
 
-            GameObject newObstacle = Instantiate(obstaclePrefab, position, Quaternion.identity);
+                float y =
+                    Mathf.Round(Random.Range(-4f, 4f));
+
+                spawnPosition =
+                    new Vector3(x, y, 0f);
+
+                // Không spawn gần đầu rắn
+                if (Vector3.Distance(
+                    spawnPosition,
+                    snake.transform.position) > 2.5f)
+                {
+                    validPosition = true;
+
+                    // Không spawn đè obstacle khác
+                    foreach (GameObject obstacle
+                        in obstacles)
+                    {
+                        if (Vector3.Distance(
+                            spawnPosition,
+                            obstacle.transform.position) < 1f)
+                        {
+                            validPosition = false;
+
+                            break;
+                        }
+                    }
+                }
+            }
+
+            GameObject newObstacle =
+                Instantiate(
+                    obstaclePrefab,
+                    spawnPosition,
+                    Quaternion.identity);
 
             obstacles.Add(newObstacle);
         }
@@ -130,40 +227,36 @@ public class GameManager : MonoBehaviour
 
     public void Easy()
     {
-        // Chậm - dễ chơi
         snakeSpeed = 0.22f;
 
-        SpawnObstacles(0);
+        currentObstacleAmount = 0;
 
         difficultyPanel.SetActive(false);
     }
 
     public void Medium()
     {
-        // Bình thường
         snakeSpeed = 0.18f;
 
-        SpawnObstacles(0);
+        currentObstacleAmount = 0;
 
         difficultyPanel.SetActive(false);
     }
 
     public void Hard()
     {
-        // Khó hơn
         snakeSpeed = 0.14f;
 
-        SpawnObstacles(5);
+        currentObstacleAmount = 4;
 
         difficultyPanel.SetActive(false);
     }
 
     public void VeryHard()
     {
-        // Rất khó
         snakeSpeed = 0.11f;
 
-        SpawnObstacles(8);
+        currentObstacleAmount = 7;
 
         difficultyPanel.SetActive(false);
     }
@@ -176,20 +269,31 @@ public class GameManager : MonoBehaviour
     {
         score += point;
 
-        UpdateScore();
-
-        // Điều kiện thắng
-        if (score >= 100)
+        // Cập nhật High Score
+        if (score > highScore)
         {
-            WinGame();
+            highScore = score;
         }
+
+        UpdateScore();
     }
+
+    // =========================
+    // UPDATE SCORE UI
+    // =========================
 
     void UpdateScore()
     {
         if (scoreText != null)
         {
-            scoreText.text = "Score: " + score;
+            scoreText.text =
+                "Score: " + score;
+        }
+
+        if (highScoreText != null)
+        {
+            highScoreText.text =
+                "High Score: " + highScore;
         }
     }
 
@@ -209,34 +313,20 @@ public class GameManager : MonoBehaviour
     }
 
     // =========================
-    // WIN GAME
-    // =========================
-
-    public void WinGame()
-    {
-        winPanel.SetActive(true);
-
-        Time.timeScale = 0f;
-    }
-
-    // =========================
-    // RESTART
+    // RESTART GAME
     // =========================
 
     public void RestartGame()
     {
         gameOverPanel.SetActive(false);
 
-        winPanel.SetActive(false);
-
-        // Hiện lại điểm
-        scoreText.gameObject.SetActive(true);
-
         score = 0;
 
         UpdateScore();
 
         snake.ResetState();
+
+        SpawnObstacles(currentObstacleAmount);
 
         isGameOver = false;
 
@@ -255,20 +345,30 @@ public class GameManager : MonoBehaviour
 
         gameOverPanel.SetActive(false);
 
-        winPanel.SetActive(false);
+        // Ẩn UI điểm
+        if (scoreText != null)
+        {
+            scoreText.gameObject.SetActive(false);
+        }
 
-        // Ẩn điểm ở menu
-        scoreText.gameObject.SetActive(false);
+        if (highScoreText != null)
+        {
+            highScoreText.gameObject.SetActive(false);
+        }
 
-        // Xóa obstacle khi về menu
-        foreach (GameObject obstacle in obstacles)
+        // Xóa obstacle
+        foreach (GameObject obstacle
+            in obstacles)
         {
             Destroy(obstacle);
         }
 
         obstacles.Clear();
 
+        // Reset điểm
         score = 0;
+
+        highScore = 0;
 
         UpdateScore();
 
@@ -284,3 +384,4 @@ public class GameManager : MonoBehaviour
         Application.Quit();
     }
 }
+

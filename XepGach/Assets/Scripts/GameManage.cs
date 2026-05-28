@@ -1,11 +1,12 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;
 
 public enum GameMode
 {
     Classic,
     TimeAttack,
-    Level
+    Challenge
 }
 
 public enum GameState
@@ -14,7 +15,8 @@ public enum GameState
     Mode,
     Playing,
     Paused,
-    GameOver
+    GameOver,
+    YouWin
 }
 
 public class GameManager : MonoBehaviour
@@ -30,16 +32,32 @@ public class GameManager : MonoBehaviour
     public GameObject hudPanel;
     public GameObject pausePanel;
     public GameObject gameOverPanel;
+    public GameObject youWinPanel;
 
     [Header("Gameplay References")]
     public Spawner spawner;
+    public Board board;
     public GameObject gridBoard;
+
+    [Header("HUD Texts")]
+    public TMP_Text modeText;
+    public TMP_Text timerText;
+    public TMP_Text challengeText;
+
+    [Header("Time Attack Settings")]
+    public float timeAttackDuration = 120f;
+
+    [Header("Challenge Settings")]
+    public float challengeDuration = 60f;
+    public int challengeTargetLines = 10;
 
     [Header("Current")]
     public GameMode currentMode = GameMode.Classic;
     public GameState currentState = GameState.Home;
 
     private bool hasStartedGame = false;
+    private float currentTime;
+    private float challengeTime;
 
     private void Awake()
     {
@@ -48,6 +66,11 @@ public class GameManager : MonoBehaviour
         if (spawner == null)
         {
             spawner = FindFirstObjectByType<Spawner>();
+        }
+
+        if (board == null)
+        {
+            board = FindFirstObjectByType<Board>();
         }
     }
 
@@ -70,6 +93,14 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        if (currentState != GameState.Playing) return;
+
+        UpdateTimeAttackMode();
+        UpdateChallengeMode();
+    }
+
     private void HideAllPanels()
     {
         if (homePanel != null) homePanel.SetActive(false);
@@ -77,28 +108,14 @@ public class GameManager : MonoBehaviour
         if (hudPanel != null) hudPanel.SetActive(false);
         if (pausePanel != null) pausePanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
+        if (youWinPanel != null) youWinPanel.SetActive(false);
     }
 
-    private void SetGameplayVisible(bool isVisible)
+    private void SetGameplayVisible(bool value)
     {
         if (gridBoard != null)
         {
-            gridBoard.SetActive(isVisible);
-        }
-    }
-
-    private void CacheSpawner()
-    {
-        if (spawner != null) return;
-
-        if (gridBoard != null)
-        {
-            spawner = gridBoard.GetComponent<Spawner>();
-        }
-
-        if (spawner == null)
-        {
-            spawner = FindFirstObjectByType<Spawner>();
+            gridBoard.SetActive(value);
         }
     }
 
@@ -110,6 +127,19 @@ public class GameManager : MonoBehaviour
         panel.transform.SetAsLastSibling();
     }
 
+    private void CacheReferences()
+    {
+        if (spawner == null)
+        {
+            spawner = FindFirstObjectByType<Spawner>();
+        }
+
+        if (board == null)
+        {
+            board = FindFirstObjectByType<Board>();
+        }
+    }
+
     public void ShowHome()
     {
         currentState = GameState.Home;
@@ -119,8 +149,6 @@ public class GameManager : MonoBehaviour
         SetGameplayVisible(false);
 
         ShowPanelOnTop(homePanel);
-
-        Debug.Log("Show Home");
     }
 
     public void ShowModePanel()
@@ -132,8 +160,6 @@ public class GameManager : MonoBehaviour
         SetGameplayVisible(false);
 
         ShowPanelOnTop(modePanel);
-
-        Debug.Log("Show Mode Panel");
     }
 
     public void BackToHome()
@@ -153,9 +179,9 @@ public class GameManager : MonoBehaviour
         StartGame();
     }
 
-    public void PlayLevel()
+    public void PlayChallenge()
     {
-        currentMode = GameMode.Level;
+        currentMode = GameMode.Challenge;
         StartGame();
     }
 
@@ -173,10 +199,12 @@ public class GameManager : MonoBehaviour
             hudPanel.transform.SetAsFirstSibling();
         }
 
+        CacheReferences();
+
         PlayerPrefs.SetInt(LastModeKey, (int)currentMode);
         PlayerPrefs.Save();
 
-        CacheSpawner();
+        SetupModeUI();
 
         if (!hasStartedGame)
         {
@@ -184,12 +212,11 @@ public class GameManager : MonoBehaviour
 
             if (spawner != null)
             {
-                Debug.Log("GameManager gọi Spawner.StartNewGame()");
                 spawner.StartNewGame();
             }
             else
             {
-                Debug.LogError("LỖI: Chưa kéo Spawner vào GameManager!");
+                Debug.LogError("Chưa kéo Spawner vào GameManager!");
             }
         }
 
@@ -201,13 +228,109 @@ public class GameManager : MonoBehaviour
         Debug.Log("Start Game - Mode: " + currentMode);
     }
 
-    public void PauseGame()
+    private void SetupModeUI()
     {
-        if (currentState != GameState.Playing)
+        currentTime = timeAttackDuration;
+        challengeTime = challengeDuration;
+
+        if (modeText != null)
         {
-            Debug.LogWarning("Không pause được vì currentState = " + currentState);
+            if (currentMode == GameMode.Classic)
+            {
+                modeText.text = "Classic";
+            }
+            else if (currentMode == GameMode.TimeAttack)
+            {
+                modeText.text = "Time Attack";
+            }
+            else if (currentMode == GameMode.Challenge)
+            {
+                modeText.text = "Challenge";
+            }
+        }
+
+        // TimerText chỉ hiện ở chế độ tính giờ
+        if (timerText != null)
+        {
+            bool isTimeAttack = currentMode == GameMode.TimeAttack;
+            timerText.gameObject.SetActive(isTimeAttack);
+
+            if (isTimeAttack)
+            {
+                timerText.text = FormatTime(currentTime);
+            }
+        }
+
+        if (challengeText != null)
+        {
+            bool isChallenge = currentMode == GameMode.Challenge;
+            challengeText.gameObject.SetActive(isChallenge);
+
+            if (isChallenge)
+            {
+                challengeText.text = "Thử thách: 0/" + challengeTargetLines;
+            }
+        }
+    }
+
+    private void UpdateTimeAttackMode()
+    {
+        if (currentMode != GameMode.TimeAttack) return;
+
+        currentTime -= Time.deltaTime;
+
+        if (currentTime < 0)
+        {
+            currentTime = 0;
+        }
+
+        if (timerText != null)
+        {
+            timerText.text = FormatTime(currentTime);
+        }
+
+        if (currentTime <= 0)
+        {
+            ShowGameOver();
+        }
+    }
+
+    private void UpdateChallengeMode()
+    {
+        if (currentMode != GameMode.Challenge) return;
+        if (board == null) return;
+
+        challengeTime -= Time.deltaTime;
+
+        if (challengeTime < 0)
+        {
+            challengeTime = 0;
+        }
+
+        int currentLines = board.TotalLines;
+
+        if (challengeText != null)
+        {
+            challengeText.text = "Thử thách: " + currentLines + "/" + challengeTargetLines;
+        }
+
+        // Hoàn thành thử thách bằng cách xóa đủ dòng
+        if (currentLines >= challengeTargetLines)
+        {
+            ShowYouWin();
             return;
         }
+
+        // Hoặc sống sót hết thời gian thử thách
+        if (challengeTime <= 0)
+        {
+            ShowYouWin();
+        }
+    }
+
+    public void PauseGame()
+    {
+        if (currentState != GameState.Playing) return;
 
         currentState = GameState.Paused;
         Time.timeScale = 0f;
@@ -222,17 +345,11 @@ public class GameManager : MonoBehaviour
         }
 
         ShowPanelOnTop(pausePanel);
-
-        Debug.Log("Pause Game");
     }
 
     public void ContinueGame()
     {
-        if (currentState != GameState.Paused)
-        {
-            Debug.LogWarning("Không continue được vì currentState = " + currentState);
-            return;
-        }
+        if (currentState != GameState.Paused) return;
 
         currentState = GameState.Playing;
         Time.timeScale = 1f;
@@ -244,8 +361,6 @@ public class GameManager : MonoBehaviour
         {
             hudPanel.SetActive(true);
         }
-
-        Debug.Log("Continue Game");
     }
 
     public void ShowGameOver()
@@ -263,14 +378,27 @@ public class GameManager : MonoBehaviour
         }
 
         ShowPanelOnTop(gameOverPanel);
+    }
 
-        Debug.Log("Show Game Over");
+    public void ShowYouWin()
+    {
+        currentState = GameState.YouWin;
+        Time.timeScale = 0f;
+
+        HideAllPanels();
+        SetGameplayVisible(true);
+
+        if (hudPanel != null)
+        {
+            hudPanel.SetActive(true);
+            hudPanel.transform.SetAsFirstSibling();
+        }
+
+        ShowPanelOnTop(youWinPanel);
     }
 
     public void RestartGame()
     {
-        Debug.Log("Restart Game");
-
         Time.timeScale = 1f;
 
         PlayerPrefs.SetInt(AutoStartKey, 1);
@@ -282,8 +410,6 @@ public class GameManager : MonoBehaviour
 
     public void GoHome()
     {
-        Debug.Log("Go Home");
-
         Time.timeScale = 1f;
 
         PlayerPrefs.SetInt(AutoStartKey, 0);
@@ -294,8 +420,6 @@ public class GameManager : MonoBehaviour
 
     public void ExitGame()
     {
-        Debug.Log("Exit Game");
-
         Application.Quit();
 
 #if UNITY_EDITOR
@@ -303,7 +427,20 @@ public class GameManager : MonoBehaviour
 #endif
     }
 
-    // Hàm dự phòng nếu nút cũ đang gắn tên khác
+    private string FormatTime(float time)
+    {
+        int minutes = Mathf.FloorToInt(time / 60f);
+        int seconds = Mathf.FloorToInt(time % 60f);
+
+        return minutes.ToString("00") + ":" + seconds.ToString("00");
+    }
+
+    // Hàm dự phòng nếu nút cũ vẫn đang gọi PlayLevel
+    public void PlayLevel()
+    {
+        PlayChallenge();
+    }
+
     public void BackToHomePanel()
     {
         BackToHome();
@@ -317,10 +454,5 @@ public class GameManager : MonoBehaviour
     public void Home()
     {
         GoHome();
-    }
-
-    public void Play()
-    {
-        PlayClassic();
     }
 }
